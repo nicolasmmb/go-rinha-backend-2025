@@ -1,0 +1,14 @@
+{
+    "files.exclude": {
+        "**/.git/**": true,
+        "**/.idea/**": true,
+        "**/build/**": true,
+        "**/dist/**": true,
+        "**/node_modules/**": true,
+        "**/__pycache__/**": true,
+        "**/.pytest_cache/**": true,
+        "**/.mypy_cache/**": true,
+        "**/.dart_tool/**": true,
+        "**/__debug_bin**": true
+    },
+}

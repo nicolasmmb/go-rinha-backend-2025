@@ -1,0 +1,15 @@
+# Git files
+.git
+.gitignore
+
+# Docker files
+.dockerignore
+Dockerfile
+docker-compose.yml
+
+# Go build cache and modules (if any are local)
+bin/
+vendor/
+
+# Environment files
+.env

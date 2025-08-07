@@ -1,0 +1,14 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "update_go_inputs",
+            "type": "shell",
+            "command": "python .vscode/update_go_inputs.py",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent"
+            }
+        }
+    ]
+}

@@ -1,0 +1,30 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "\ud83d\udd0d Update Go Files",
+            "type": "python",
+            "program": "${workspaceFolder}/.vscode/update_go_inputs.py",
+            "console": "integratedTerminal",
+            "request": "launch"
+        },
+        {
+            "name": "\ud83d\udd0e\ud83e\udeb2: ${input:arquivoSelecionado}",
+            "type": "go",
+            "request": "launch",
+            "program": "${workspaceFolder}/cmd/${input:arquivoSelecionado}",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "arquivoSelecionado",
+            "type": "pickString",
+            "description": "Escolha o arquivo a ser executado: ",
+            "options": [
+                "api/main.go"
+            ]
+        }
+    ]
+}
