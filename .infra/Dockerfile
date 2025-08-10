@@ -8,6 +8,8 @@ RUN go mod download
 
 COPY cmd ./cmd/
 COPY internal ./internal/
+COPY libs ./libs/
+
 
 RUN CGO_ENABLED=0 go build -ldflags="-w -s" -o server ./cmd/api/main.go
 

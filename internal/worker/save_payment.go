@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/nicolasmmb/rinha-backend-2025/internal/domain"
-	"github.com/nicolasmmb/rinha-backend-2025/internal/service"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/domain"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/service"
 )
 
 type savePaymentWorker struct {
@@ -37,13 +37,10 @@ func (w *savePaymentWorker) processPayments(ctx context.Context) {
 	for {
 		payment, err := w.svc.ConsumeMessageFromQueue(ctx)
 		if err != nil {
-			slog.Error("[Worker:SavePayment:processPayments] - Failed to consume payment from queue", "error", err)
+			slog.Warn("[Worker:SavePayment:processPayments] - Failed to consume payment from queue", "error", err)
 			continue
 		}
-
 		w.svc.SavePayment(ctx, payment)
 	}
 
 }
-
-// This method is intended to run the payment processor logic.

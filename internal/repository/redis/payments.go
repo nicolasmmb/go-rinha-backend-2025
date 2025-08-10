@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/nicolasmmb/rinha-backend-2025/internal/domain"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/domain"
 	"github.com/redis/go-redis/v9"
 
 	"fmt"
@@ -49,7 +49,7 @@ func (r *paymentsRedisRepository) SavePayment(ctx context.Context, payment *doma
 		return err
 	}
 	err = r.db.ZAdd(ctx, RD_KEY_TX_PAYMENTS, redis.Z{
-		Score:  float64(payment.RequestedAt.Unix()),
+		Score:  float64(payment.RequestedAt.UnixNano()),
 		Member: b,
 	}).Err()
 
@@ -64,8 +64,8 @@ func (r *paymentsRedisRepository) GetSummary(ctx context.Context, from, to *time
 
 	slog.Info("[RP:Payment:GetSummary] - Retrieving payment summary", "from", from, "to", to)
 	iter, err := r.db.ZRangeByScore(ctx, RD_KEY_TX_PAYMENTS, &redis.ZRangeBy{
-		Min: fmt.Sprintf("%d", from.Unix()),
-		Max: fmt.Sprintf("%d", to.Unix()),
+		Min: fmt.Sprintf("%d", from.UnixNano()),
+		Max: fmt.Sprintf("%d", to.UnixNano()),
 	}).Result()
 
 	if err != nil {
@@ -136,6 +136,7 @@ func (r *paymentsRedisRepository) ConsumeMessageFromQueue(ctx context.Context) (
 			slog.Warn("[RP:Payment:ConsumeMessageFromQueue:01] - No messages in queue")
 			return nil, nil
 		}
+
 		slog.Error("[RP:Payment:ConsumeMessageFromQueue:02] - Failed to consume message from queue", "error", err)
 		return nil, err
 	}

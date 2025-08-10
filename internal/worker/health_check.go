@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/nicolasmmb/rinha-backend-2025/internal/core"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/core"
 )
 
 const (
@@ -55,6 +55,7 @@ func (w *healthCheckWorker) PerformHealthCheck(ctx context.Context) error {
 	slog.Info("Performing health check")
 	w.repo.Lock(ctx)
 	defer w.repo.Unlock(ctx)
+
 	defaultStatus := w.performHealthCheck(w.SERVICE_HEALTH_DEFAULT)
 	if defaultStatus == nil {
 		slog.Error("Default health check failed, trying fallback")

@@ -8,13 +8,13 @@ import (
 	"net/http/pprof"
 	"time"
 
-	"github.com/nicolasmmb/rinha-backend-2025/internal/config/env"
-	"github.com/nicolasmmb/rinha-backend-2025/internal/database"
-	"github.com/nicolasmmb/rinha-backend-2025/internal/repository/redis"
-	"github.com/nicolasmmb/rinha-backend-2025/internal/router"
-	"github.com/nicolasmmb/rinha-backend-2025/internal/service"
-	"github.com/nicolasmmb/rinha-backend-2025/internal/worker"
-	"github.com/nicolasmmb/rinha-backend-2025/libs"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/config/env"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/database"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/repository/redis"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/router"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/service"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/worker"
+	"github.com/nicolasmmb/go-rinha-backend-2025/libs"
 )
 
 func main() {
@@ -34,7 +34,6 @@ func main() {
 	paymentRepo := redis.NewPaymentsRepository(rds)
 	paymentSvc := service.NewPaymentService(paymentRepo, healthCheckRepo)
 	paymentHandler := router.NewPaymentHandler(paymentSvc)
-	paymentRoutes := router.Routes(paymentHandler)
 
 	// Initialize Health Check Worker
 	w := worker.NewHealthCheckWorker(healthCheckRepo, env.Values.HEALTH_URL_DEFAULT, env.Values.HEALTH_URL_FALLBACK)
@@ -42,6 +41,9 @@ func main() {
 	// Initialize Save Payment Worker
 	savePaymentWorker := worker.NewSavePaymentWorker(paymentSvc, env.Values.PAYMENT_PROCESSOR_URL_DEFAULT, env.Values.PAYMENT_PROCESSOR_URL_FALLBACK, env.Values.WORKER_POOL, 2000)
 	go savePaymentWorker.RunPaymentProcessor(context.Background())
+
+	// Initialize Payment Routes
+	paymentRoutes := router.Routes(paymentHandler)
 
 	// Configure Routes
 	paymentRoutes.HandleFunc("/debug/pprof/", pprof.Index)

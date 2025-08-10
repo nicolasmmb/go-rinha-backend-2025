@@ -44,10 +44,15 @@ func (r *healthCheckRedisRepository) ResetState(ctx context.Context) error {
 
 func (r *healthCheckRedisRepository) SaveBestProssessingProvider(ctx context.Context, provider string) error {
 	slog.Info("[RP:HealthCheck:SaveBestProcessingProvider] - Saving best processing provider", "provider", provider)
+	r.Healthy.Store(provider)
 	return r.db.Set(ctx, "best_processing_provider", provider, 0).Err()
 }
 func (r *healthCheckRedisRepository) GetBestProcessingProvider(ctx context.Context) (string, error) {
 	slog.Info("[RP:HealthCheck:GetBestProcessingProvider] - Retrieving best processing provider")
+	// try to get from atomic
+	if provider, ok := r.Healthy.Load().(string); ok {
+		return provider, nil
+	}
 	provider, err := r.db.Get(ctx, "best_processing_provider").Result()
 	if err != nil {
 		slog.Info("[RP:HealthCheck:GetBestProcessingProvider] - Failed to retrieve best processing provider", "error", err)

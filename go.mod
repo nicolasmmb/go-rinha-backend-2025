@@ -1,4 +1,4 @@
-module github.com/nicolasmmb/rinha-backend-2025
+module github.com/nicolasmmb/go-rinha-backend-2025
 
 go 1.24.5
 

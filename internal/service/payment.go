@@ -10,9 +10,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/nicolasmmb/rinha-backend-2025/internal/config/env"
-	"github.com/nicolasmmb/rinha-backend-2025/internal/core"
-	"github.com/nicolasmmb/rinha-backend-2025/internal/domain"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/config/env"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/core"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/domain"
 )
 
 type PaymentService struct {
@@ -89,18 +89,17 @@ func (s *PaymentService) GetPaymentByCorrelationID(ctx context.Context, correlat
 func (s *PaymentService) SavePayment(ctx context.Context, payment *domain.Payment) error { // Renamed from SavePayemnt
 	slog.Info("[SVC:Payment:SavePayemnt] - Saving payment", "correlation_id", payment.CorrelationId)
 	//
-	provider, _ := s.repoHealthCheck.GetBestProcessingProvider(ctx)
+	// provider, _ := s.repoHealthCheck.GetBestProcessingProvider(ctx)
 
-	switch provider {
-	case "d":
-		slog.Info("[SVC:Payment:SavePayemnt] - Using default payment processor", "provider", provider)
-	case "f":
-		slog.Info("[SVC:Payment:SavePayemnt] - Using fallback payment processor", "provider", provider)
-	default:
-		// re sent
-		slog.Error("[SVC:Payment:SavePayemnt] - No valid payment processor available", "provider", provider)
-	}
-	// return s.repoPayment.SavePayment(ctx, payment)
+	// switch provider {
+	// case "d":
+	// 	slog.Info("[SVC:Payment:SavePayemnt] - Using default payment processor", "provider", provider)
+	// case "f":
+	// 	slog.Info("[SVC:Payment:SavePayemnt] - Using fallback payment processor", "provider", provider)
+	// default:
+	// 	// re sent
+	// 	slog.Error("[SVC:Payment:SavePayemnt] - No valid payment processor available", "provider", provider)
+	// }
 	return nil
 }
 
@@ -125,12 +124,12 @@ func (s *PaymentService) ConsumeMessageFromQueue(ctx context.Context) (*domain.P
 		processorUrl = env.Values.PAYMENT_PROCESSOR_URL_FALLBACK
 		slog.Info("[SVC:Payment:ConsumeMessageFromQueue] - Using fallback payment processor", "provider", provider)
 	default:
-		slog.Info("[SVC:Payment:ConsumeMessageFromQueue] - No valid payment processor available", "provider", provider)
-		err = s.repoPayment.AddPaymentToQueue(ctx, payment)
-		if err != nil {
-			slog.Error("[SVC:Payment:ConsumeMessageFromQueue] - Failed to resend payment to queue", "error", err)
-			return nil, err
-		}
+		slog.Info("---> [SVC:Payment:ConsumeMessageFromQueue] - No valid payment processor available", "provider", provider)
+		// err = s.repoPayment.AddPaymentToQueue(ctx, payment)
+		// if err != nil {
+		// 	slog.Error("[SVC:Payment:ConsumeMessageFromQueue] - Failed to resend payment to queue", "error", err)
+		// 	return nil, err
+		// }
 	}
 
 	body := map[string]interface{}{
@@ -149,6 +148,8 @@ func (s *PaymentService) ConsumeMessageFromQueue(ctx context.Context) (*domain.P
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		log.Printf("[?:Payment:ConsumeMessageFromQueue] Failed to send request: %v, Error: %v, Processor: %s", payment.CorrelationId, err, payment.Processor)
+		s.repoPayment.AddPaymentToQueue(ctx, payment)
+		return nil, err
 	}
 	defer resp.Body.Close()
 	// if not between 200 to 300 return error
@@ -160,7 +161,7 @@ func (s *PaymentService) ConsumeMessageFromQueue(ctx context.Context) (*domain.P
 
 	if err := s.repoPayment.SavePayment(ctx, payment); err != nil {
 		log.Printf("[?:Payment:ConsumeMessageFromQueue] Failed to save payment: %v, Error: %v, Processor: %s", payment.CorrelationId, err, payment.Processor)
-		s.repoPayment.AddPaymentToQueue(ctx, payment) // Requeue the payment if saving fails
+		s.repoPayment.AddPaymentToQueue(ctx, payment)
 		return nil, err
 	}
 

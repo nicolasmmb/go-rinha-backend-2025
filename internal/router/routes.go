@@ -9,9 +9,9 @@ import (
 
 	json "github.com/json-iterator/go"
 
-	"github.com/nicolasmmb/rinha-backend-2025/internal/domain"
-	"github.com/nicolasmmb/rinha-backend-2025/internal/model"
-	"github.com/nicolasmmb/rinha-backend-2025/internal/service"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/domain"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/model"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/service"
 )
 
 const (
@@ -103,7 +103,16 @@ func (h *paymentHandler) ResetPayments(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to reset payments", http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	response := map[string]string{"message": "Payments reset successfully"}
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
+	log.Println("Payments reset successfully")
+
 }
 
 func Routes(handler *paymentHandler) *http.ServeMux {
@@ -112,6 +121,7 @@ func Routes(handler *paymentHandler) *http.ServeMux {
 	mux.HandleFunc(ROUTE_PAYMENT_SUMMARY, handler.GetSummary)
 	mux.HandleFunc(ROUTE_PAYMENT_GET, handler.GetPayment)
 	mux.HandleFunc(ROUTE_HEALTH_CHECK, handler.HealthCheck)
+	mux.HandleFunc("/reset", handler.ResetPayments)
 
 	return mux
 
@@ -119,6 +129,7 @@ func Routes(handler *paymentHandler) *http.ServeMux {
 func (h *paymentHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	slog.Info("Health check endpoint hit")
 }
 
 func (h *paymentHandler) GetPayment(w http.ResponseWriter, r *http.Request) {

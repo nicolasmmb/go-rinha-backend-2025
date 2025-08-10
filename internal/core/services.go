@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/nicolasmmb/rinha-backend-2025/internal/domain"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/domain"
 )
 
 type PaymentRepositoryInterface interface {
