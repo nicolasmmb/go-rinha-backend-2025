@@ -33,7 +33,11 @@ type healthCheckWorker struct {
 }
 
 func NewHealthCheckWorker(repo core.HealthCheckRepositoryInterface, SERVICE_HEALTH_DEFAULT string, SERVICE_HEALTH_FALLBACK string) *healthCheckWorker {
-	return &healthCheckWorker{repo: repo, SERVICE_HEALTH_DEFAULT: SERVICE_HEALTH_DEFAULT, SERVICE_HEALTH_FALLBACK: SERVICE_HEALTH_FALLBACK}
+	return &healthCheckWorker{
+		repo:                    repo,
+		SERVICE_HEALTH_DEFAULT:  SERVICE_HEALTH_DEFAULT,
+		SERVICE_HEALTH_FALLBACK: SERVICE_HEALTH_FALLBACK,
+	}
 }
 
 func (w *healthCheckWorker) Run(ctx context.Context) {
