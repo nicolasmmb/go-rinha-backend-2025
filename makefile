@@ -1,4 +1,6 @@
 run-load-test:
+	@curl -X POST  127.0.0.1:8001/admin/purge-payments
+	@curl -X POST  127.0.0.1:8002/admin/purge-payments
 	K6_WEB_DASHBOARD=true \
 	K6_WEB_DASHBOARD_PORT=5665 \
 	K6_WEB_DASHBOARD_PERIOD=2s \
