@@ -20,26 +20,40 @@ const (
 )
 
 type paymentsRedisRepository struct {
-	db *redis.Client
+	db             *redis.Client
+	QueuedPayments chan *domain.Payment
 }
 
-func NewPaymentsRepository(db *redis.Client) *paymentsRedisRepository {
-	return &paymentsRedisRepository{db: db}
+func NewPaymentsRepository(db *redis.Client, QueuedPayments chan *domain.Payment) *paymentsRedisRepository {
+	return &paymentsRedisRepository{db: db, QueuedPayments: QueuedPayments}
 }
 
 func (r *paymentsRedisRepository) AddPaymentToQueue(ctx context.Context, payment *domain.Payment) error {
-	slog.Info("[RP:Payment:AddPaymentToQueue:00] - Publishing payment to Redis", "correlation_id", payment.CorrelationId)
-	b, err := msgpack.Marshal(payment)
-	if err != nil {
-		slog.Error("[RP:Payment:AddPaymentToQueue:01] - Failed to marshal payment", "correlation_id", payment.CorrelationId, "error", err)
-		return err
-	}
-	err = r.db.LPush(ctx, QUEUE_PAYMENTS, b).Err()
-	if err != nil {
-		slog.Error("[RP:Payment:AddPaymentToQueue:02] - Failed to save payment to Redis", "correlation_id", payment.CorrelationId, "error", err)
-		return err
-	}
+	r.QueuedPayments <- payment
+
+	// slog.Info("[RP:Payment:AddPaymentToQueue:00] - Publishing payment to Redis", "correlation_id", payment.CorrelationId)
+	// b, err := msgpack.Marshal(payment)
+	// if err != nil {
+	// 	slog.Error("[RP:Payment:AddPaymentToQueue:01] - Failed to marshal payment", "correlation_id", payment.CorrelationId, "error", err)
+	// 	return err
+	// }
+	// err = r.db.LPush(ctx, QUEUE_PAYMENTS, b).Err()
+	// if err != nil {
+	// 	slog.Error("[RP:Payment:AddPaymentToQueue:02] - Failed to save payment to Redis", "correlation_id", payment.CorrelationId, "error", err)
+	// 	return err
+	// }
 	return nil
+}
+
+func (r *paymentsRedisRepository) GetPaymentFromChannel(ctx context.Context) (*domain.Payment, error) {
+	select {
+	case payment := <-r.QueuedPayments:
+		slog.Info("[RP:Payment:GetPaymentFromChannel] - Retrieved payment from channel", "correlation_id", payment.CorrelationId)
+		return payment, nil
+	case <-ctx.Done():
+		slog.Warn("[RP:Payment:GetPaymentFromChannel] - Context cancelled while waiting for payment")
+		return nil, ctx.Err()
+	}
 }
 
 func (r *paymentsRedisRepository) SavePayment(ctx context.Context, payment *domain.Payment) (err error) {

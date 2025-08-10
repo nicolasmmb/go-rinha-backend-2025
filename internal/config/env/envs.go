@@ -6,6 +6,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -19,11 +20,12 @@ type values struct {
 	HEALTH_URL_DEFAULT             string
 	HEALTH_URL_FALLBACK            string
 	WORKER_POOL                    int
+	PAYMENT_CHAN_SIZE              int
 }
 
 var Values = &values{}
 
-func Load() {
+func Load() error {
 	// Carrega o arquivo .env, se existir.
 	err := godotenv.Load()
 	if err != nil {
@@ -34,6 +36,8 @@ func Load() {
 	v := reflect.ValueOf(Values).Elem()
 	t := v.Type()
 
+	var missingVars []string
+
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
 		fieldType := t.Field(i)
@@ -42,8 +46,7 @@ func Load() {
 		// Busca o valor da variável de ambiente.
 		envVarValue, ok := os.LookupEnv(envVarName)
 		if !ok {
-			// Se a variável não estiver definida, pula para a próxima.
-			// O campo manterá seu valor zero (vazio, 0, false).
+			missingVars = append(missingVars, envVarName)
 			continue
 		}
 
@@ -77,6 +80,17 @@ func Load() {
 			}
 		}
 	}
+
+	if len(missingVars) > 0 {
+		for i, v := range missingVars {
+			missingVars[i] = "- " + v
+		}
+		details := strings.Join(missingVars, "\n")
+		return fmt.Errorf("some environment variables are missing:\n%s", details)
+
+	}
+
+	return nil
 }
 
 func ShowEnvValues() {

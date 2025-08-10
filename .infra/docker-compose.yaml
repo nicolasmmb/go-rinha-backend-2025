@@ -7,7 +7,9 @@ x-api-service: &api-service
     - backend
     - payment-processor
   environment:
-    - WORKER_POOL=15
+    - GOMEMLIMIT=200
+    - WORKER_POOL=300
+    - PAYMENT_CHAN_SIZE=25000
     - REDIS_ADDR=mem-db:6379
     - SERVER_ADDR=0.0.0.0
     - SERVER_PORT=8080
@@ -27,8 +29,13 @@ x-api-service: &api-service
   deploy:
     resources:
       limits:
-        cpus: "0.5"
+        cpus: "0.6"
         memory: "100MB"
+  ulimits:
+      nproc: 1000000
+      nofile:
+        soft: 1000000
+        hard: 1000000
 
 
 
@@ -63,6 +70,11 @@ services:
         limits:
           cpus: "0.3"
           memory: "90MB"
+    ulimits:
+      nproc: 1000000
+      nofile:
+        soft: 1000000
+        hard: 1000000
 
   mem-db:
     image: redis:alpine

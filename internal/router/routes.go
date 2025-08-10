@@ -41,20 +41,13 @@ func (h *paymentHandler) SavePayment(w http.ResponseWriter, r *http.Request) {
 		RequestedAt:   time.Now().UTC(),
 	}
 
-	// Execute the save operation in a separate goroutine (fire-and-forget)
-	// to respond to the client as quickly as possible.
 	go func() {
-		// It's crucial to recover from potential panics within a goroutine
-		// to prevent the entire application from crashing.
+		defer r.Body.Close()
 		defer func() {
 			if r := recover(); r != nil {
 				log.Printf("Recovered from panic in SavePayment goroutine: %v", r)
 			}
 		}()
-
-		// Since this runs asynchronously, we can't return an error to the client.
-		// We log it for monitoring and debugging purposes.
-		// We use the request's context to propagate cancellation signals.
 		if err := h.Svc.SendPaymentToQueue(context.Background(), payment); err != nil {
 			log.Printf("Error saving payment asynchronously: %v", err)
 		}
@@ -87,7 +80,7 @@ func (h *paymentHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to get summary", http.StatusInternalServerError)
 		return
 	}
-
+	slog.Info("Summary retrieved successfully: ", "from", from, "to", to)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(summary); err != nil {

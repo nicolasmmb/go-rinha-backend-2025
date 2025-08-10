@@ -10,6 +10,7 @@ import (
 
 	"github.com/nicolasmmb/go-rinha-backend-2025/internal/config/env"
 	"github.com/nicolasmmb/go-rinha-backend-2025/internal/database"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/domain"
 	"github.com/nicolasmmb/go-rinha-backend-2025/internal/repository/redis"
 	"github.com/nicolasmmb/go-rinha-backend-2025/internal/router"
 	"github.com/nicolasmmb/go-rinha-backend-2025/internal/service"
@@ -18,7 +19,9 @@ import (
 )
 
 func main() {
-	env.Load()
+	if err := env.Load(); err != nil {
+		log.Fatalf("Error loading environment variables: %v", err)
+	}
 	env.ShowEnvValues()
 
 	rds, err := database.ConnectToRedisClient(env.Values.REDIS_ADDR)
@@ -27,22 +30,36 @@ func main() {
 	}
 	defer database.CloseRedisClient()
 
+	ctx := context.Background()
+
 	// Initialize Health Check Repository
 	healthCheckRepo := redis.NewHealthCheckRepository(rds)
 
 	// Initialize Payment Repository and Service
-	paymentRepo := redis.NewPaymentsRepository(rds)
+	paymentChannel := make(chan *domain.Payment, env.Values.PAYMENT_CHAN_SIZE)
+	paymentRepo := redis.NewPaymentsRepository(rds, paymentChannel)
 	paymentSvc := service.NewPaymentService(paymentRepo, healthCheckRepo)
 	paymentHandler := router.NewPaymentHandler(paymentSvc)
 
 	// Initialize Health Check Worker
-	w := worker.NewHealthCheckWorker(healthCheckRepo, env.Values.HEALTH_URL_DEFAULT, env.Values.HEALTH_URL_FALLBACK)
-	go w.Run(context.Background())
+	w := worker.NewHealthCheckWorker(
+		healthCheckRepo,
+		env.Values.HEALTH_URL_DEFAULT,
+		env.Values.HEALTH_URL_FALLBACK,
+	)
+	go w.Run(ctx)
 	// Initialize Save Payment Worker
-	savePaymentWorker := worker.NewSavePaymentWorker(paymentSvc, env.Values.PAYMENT_PROCESSOR_URL_DEFAULT, env.Values.PAYMENT_PROCESSOR_URL_FALLBACK, env.Values.WORKER_POOL, 2000)
+	savePaymentWorker := worker.NewSavePaymentWorker(
+		paymentSvc,
+		env.Values.PAYMENT_PROCESSOR_URL_DEFAULT,
+		env.Values.PAYMENT_PROCESSOR_URL_FALLBACK,
+		env.Values.WORKER_POOL,
+		env.Values.PAYMENT_CHAN_SIZE,
+	)
 	go savePaymentWorker.RunPaymentProcessor(context.Background())
 
 	// Initialize Payment Routes
+	time.Sleep(1 * time.Second) // Wait for the worker to start
 	paymentRoutes := router.Routes(paymentHandler)
 
 	// Configure Routes

@@ -27,11 +27,7 @@ func ConnectToRedisClient(addr string) (*redis.Client, error) {
 			return
 		}
 
-		c := redis.NewClient(&redis.Options{
-			Addr:         addr,
-			PoolSize:     32,
-			MinIdleConns: 4,
-		})
+		c := redis.NewClient(&redis.Options{Addr: addr})
 
 		pingErr := c.Ping(context.Background()).Err()
 		if pingErr != nil {

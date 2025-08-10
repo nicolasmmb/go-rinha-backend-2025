@@ -40,7 +40,7 @@ func (w *savePaymentWorker) processPayments(ctx context.Context) {
 			slog.Warn("[Worker:SavePayment:processPayments] - Failed to consume payment from queue", "error", err)
 			continue
 		}
-		w.svc.SavePayment(ctx, payment)
+		slog.Info("[Worker:SavePayment:processPayments] - Processing payment", "correlation_id", payment.CorrelationId)
 	}
 
 }

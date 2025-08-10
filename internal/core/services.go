@@ -9,6 +9,7 @@ import (
 
 type PaymentRepositoryInterface interface {
 	AddPaymentToQueue(ctx context.Context, payment *domain.Payment) error
+	GetPaymentFromChannel(ctx context.Context) (*domain.Payment, error)
 	GetPaymentByCorrelationID(ctx context.Context, correlationID string) (*domain.Payment, error)
 	ConsumeMessageFromQueue(ctx context.Context) (*domain.Payment, error)
 	SavePayment(ctx context.Context, payment *domain.Payment) error

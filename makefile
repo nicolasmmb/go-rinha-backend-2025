@@ -2,8 +2,9 @@ run-load-test:
 	K6_WEB_DASHBOARD=true \
 	K6_WEB_DASHBOARD_PORT=5665 \
 	K6_WEB_DASHBOARD_PERIOD=2s \
-	K6_WEB_DASHBOARD_OPEN=true \
-	k6 run -e MAX_REQUESTS=700 ../__PESSOAL__/rinha-de-backend-2025/rinha-test/rinha.js
+	k6 run ../__PESSOAL__/rinha-de-backend-2025/rinha-test/rinha.js
+# 	K6_MAX_REQUESTS=700 \
+# 	K6_WEB_DASHBOARD_OPEN=true \
 
 docker-compose-build-run-test:
 	@docker compose -f .infra/docker-compose.yaml down
