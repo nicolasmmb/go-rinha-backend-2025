@@ -15,7 +15,7 @@ type healthCheckRedisRepository struct {
 }
 
 func NewHealthCheckRepository(db *redis.Client) *healthCheckRedisRepository {
-	return &healthCheckRedisRepository{db: db}
+	return &healthCheckRedisRepository{db: db, Healthy: atomic.Value{}}
 
 }
 
