@@ -8,8 +8,8 @@ x-api-service: &api-service
     - payment-processor
   environment:
     - GOMEMLIMIT=200
-    - WORKER_POOL=300
-    - PAYMENT_CHAN_SIZE=25000
+    - WORKER_POOL=15
+    - PAYMENT_CHAN_SIZE=10000
     - REDIS_ADDR=mem-db:6379
     - SERVER_ADDR=0.0.0.0
     - SERVER_PORT=8080

@@ -17,6 +17,3 @@ func (p *Payment) ValidateCorrelationId() bool {
 	_, err := uuid.Parse(p.CorrelationId)
 	return err == nil
 }
-
-
-

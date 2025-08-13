@@ -10,8 +10,7 @@ COPY cmd ./cmd/
 COPY internal ./internal/
 COPY libs ./libs/
 
-
-RUN CGO_ENABLED=0 go build -ldflags="-w -s" -o server ./cmd/api/main.go
+RUN GOEXPERIMENT=arenas CGO_ENABLED=0 go build -ldflags="-w -s" -o server ./cmd/api/main.go
 
 #
 FROM alpine:latest AS api-stage
