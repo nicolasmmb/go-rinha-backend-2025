@@ -1,7 +1,7 @@
 package domain
 
 type SummaryItem struct {
-	TotalRequests int     `json:"totalRequests"`
+	TotalRequests int64   `json:"totalRequests"`
 	TotalAmount   float64 `json:"totalAmount"`
 }
 

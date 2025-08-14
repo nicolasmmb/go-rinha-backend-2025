@@ -4,165 +4,162 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
+	"io"
 	"log/slog"
+	"net"
 	"net/http"
+	"sync"
 	"time"
 
-	"github.com/nicolasmmb/rinha-backend-2025/internal/config/env"
-	"github.com/nicolasmmb/rinha-backend-2025/internal/core"
-	"github.com/nicolasmmb/rinha-backend-2025/internal/domain"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/core"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/domain"
 )
 
 type PaymentService struct {
-	repoPayment     core.PaymentRepositoryInterface
-	repoHealthCheck core.HealthCheckRepositoryInterface
-	httpClient      *http.Client
+	repoPayment core.PaymentRepositoryInterface
+	httpClient  *http.Client
+
+	paymentQueue chan domain.Payment
+	queueSize    int
+
+	URL_DEFAULT_PROCESSOR  string
+	URL_FALLBACK_PROCESSOR string
 }
 
-func NewPaymentService(paymentRepository core.PaymentRepositoryInterface, healthCheckRepository core.HealthCheckRepositoryInterface) *PaymentService {
-	return &PaymentService{repoPayment: paymentRepository, repoHealthCheck: healthCheckRepository, httpClient: &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			MaxIdleConns:        10,
-			MaxIdleConnsPerHost: 5,
-			IdleConnTimeout:     30 * time.Second,
-			DisableKeepAlives:   false,
-		},
-	}}
+var HackBufferPool = sync.Pool{
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
 }
 
-func (s *PaymentService) SendPaymentToQueue(ctx context.Context, payment *domain.Payment) error {
-	slog.Info("[SVC:Payment:SavePayemnt] - Saving payment", "correlation_id", payment.CorrelationId)
-	return s.repoPayment.AddPaymentToQueue(ctx, payment)
-}
+func NewPaymentService(paymentRepository core.PaymentRepositoryInterface, URL_DEFAULT_PROCESSOR string, URL_FALLBACK_PROCESSOR string, queueSize int) *PaymentService {
+	tr := &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   500 * time.Millisecond,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
 
-func (s *PaymentService) GetSummary(ctx context.Context, from, to *time.Time) (*domain.Summary, error) {
-	payments, err := s.repoPayment.GetSummary(ctx, from, to)
-	if err != nil {
-		slog.Error("[SVC:Payment:GetSummary] - Failed to get payment summary",
-			"error", err, "from", from, "to", to)
-		return nil, err
+		// Reutiliza conexões para diminuir a latência de novas requisições.
+		DisableKeepAlives: false,
+
+		// Limita o número total de conexões (ativas + ociosas) por host.
+		// Essencial para não sobrecarregar o serviço que você está chamando.
+		MaxConnsPerHost: 64,
+
+		// Número de conexões ociosas mantidas no pool para reutilização.
+		MaxIdleConns:        64,
+		MaxIdleConnsPerHost: 64,
+
+		// Tempo que uma conexão ociosa fica no pool antes de ser fechada.
+		IdleConnTimeout: 60 * time.Second,
+
+		// <<< AJUSTE: Desabilitar compressão é bom para serviços internos.
+		// A economia de CPU é maior que o ganho de banda na rede local.
+		DisableCompression: true,
+
+		// Forçar HTTP/2 pode não ser ideal para POSTs simples e rápidos. HTTP/1.1 é mais previsível aqui.
+		ForceAttemptHTTP2: false,
 	}
 
-	var defaultCount, fallbackCount int
-	var defaultAmount, fallbackAmount float64
+	c := &http.Client{Transport: tr, Timeout: 5 * time.Second}
 
-	for _, payment := range payments {
-		if payment.Processor == "default" {
-			defaultCount++
-			defaultAmount += payment.Amount
-		}
-		if payment.Processor == "fallback" {
-			fallbackCount++
-			fallbackAmount += payment.Amount
-		}
+	return &PaymentService{
+		repoPayment:            paymentRepository,
+		httpClient:             c,
+		URL_DEFAULT_PROCESSOR:  URL_DEFAULT_PROCESSOR,
+		URL_FALLBACK_PROCESSOR: URL_FALLBACK_PROCESSOR,
+		paymentQueue:           make(chan domain.Payment, queueSize),
+		queueSize:              queueSize,
 	}
-	x := &domain.Summary{
-		Default: domain.SummaryItem{
-			TotalRequests: defaultCount,
-			TotalAmount:   defaultAmount,
-		},
-		Fallback: domain.SummaryItem{
-			TotalRequests: fallbackCount,
-			TotalAmount:   fallbackAmount,
-		},
-	}
-
-	return x, err
 }
 
-func (s *PaymentService) ResetState(ctx context.Context) error {
-	return s.repoPayment.ResetState(ctx)
-}
-func (s *PaymentService) GetPaymentByCorrelationID(ctx context.Context, correlationID string) (*domain.Payment, error) {
-	slog.Info("Retrieving payment by correlation ID", "correlation_id", correlationID)
-	payment, err := s.repoPayment.GetPaymentByCorrelationID(ctx, correlationID)
-	if err != nil {
-		slog.Error("Failed to retrieve payment", "correlation_id", correlationID, "error", err)
-		return nil, err
-	}
-	return payment, nil
-}
-
-func (s *PaymentService) SavePayment(ctx context.Context, payment *domain.Payment) error { // Renamed from SavePayemnt
-	slog.Info("[SVC:Payment:SavePayemnt] - Saving payment", "correlation_id", payment.CorrelationId)
-	//
-	provider, _ := s.repoHealthCheck.GetBestProcessingProvider(ctx)
-
-	switch provider {
-	case "d":
-		slog.Info("[SVC:Payment:SavePayemnt] - Using default payment processor", "provider", provider)
-	case "f":
-		slog.Info("[SVC:Payment:SavePayemnt] - Using fallback payment processor", "provider", provider)
+func (ps *PaymentService) SendPaymentToQueue(payment *domain.Payment) error {
+	select {
+	case ps.paymentQueue <- *payment:
+		return nil
 	default:
-		// re sent
-		slog.Error("[SVC:Payment:SavePayemnt] - No valid payment processor available", "provider", provider)
+		return errors.New("O Galo tá cansado")
 	}
-	// return s.repoPayment.SavePayment(ctx, payment)
-	return nil
 }
 
-func (s *PaymentService) ConsumeMessageFromQueue(ctx context.Context) (*domain.Payment, error) {
-	slog.Info("[SVC:Payment:ConsumeMessageFromQueue] - Consuming message from queue")
-	payment, err := s.repoPayment.ConsumeMessageFromQueue(ctx)
+func (ps *PaymentService) GetPaymentQueue() <-chan domain.Payment {
+	return ps.paymentQueue
+}
+
+func (ps *PaymentService) sendPaymentRequest(ctx context.Context, payment *domain.Payment, url string) bool {
+
+	buf := HackBufferPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer HackBufferPool.Put(buf)
+
+	if err := json.NewEncoder(buf).Encode(payment); err != nil {
+		slog.Warn("falha ao encodar pagamento para JSON", "error", err.Error())
+		return false
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, buf)
 	if err != nil {
-		slog.Error("[SVC:Payment:ConsumeMessageFromQueue] - Failed to consume message from queue", "error", err)
-		return nil, err
-	}
-	slog.Info("[SVC:Payment:ConsumeMessageFromQueue] - Successfully consumed payment", "correlation_id", payment.CorrelationId)
-
-	provider, _ := s.repoHealthCheck.GetBestProcessingProvider(ctx)
-	var processorUrl string
-	switch provider {
-	case "d":
-		payment.Processor = "default"
-		processorUrl = env.Values.PAYMENT_PROCESSOR_URL_DEFAULT
-		slog.Info("[SVC:Payment:ConsumeMessageFromQueue] - Using default payment processor", "provider", provider)
-	case "f":
-		payment.Processor = "fallback"
-		processorUrl = env.Values.PAYMENT_PROCESSOR_URL_FALLBACK
-		slog.Info("[SVC:Payment:ConsumeMessageFromQueue] - Using fallback payment processor", "provider", provider)
-	default:
-		slog.Info("[SVC:Payment:ConsumeMessageFromQueue] - No valid payment processor available", "provider", provider)
-		err = s.repoPayment.AddPaymentToQueue(ctx, payment)
-		if err != nil {
-			slog.Error("[SVC:Payment:ConsumeMessageFromQueue] - Failed to resend payment to queue", "error", err)
-			return nil, err
-		}
+		return false
 	}
 
-	body := map[string]interface{}{
-		"correlationId": payment.CorrelationId,
-		"amount":        payment.Amount,
-		"requestedAt":   payment.RequestedAt.Format(time.RFC3339Nano),
-	}
-
-	b, _ := json.Marshal(body)
-	req, err := http.NewRequestWithContext(ctx, "POST", processorUrl, bytes.NewReader(b))
-	if err != nil {
-		log.Printf("[?:Payment:ConsumeMessageFromQueue] Failed to create request: %v, Error: %v, Processor: %s", payment.CorrelationId, err, payment.Processor)
-		return nil, err
-	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := s.httpClient.Do(req)
+
+	resp, err := ps.httpClient.Do(req)
 	if err != nil {
-		log.Printf("[?:Payment:ConsumeMessageFromQueue] Failed to send request: %v, Error: %v, Processor: %s", payment.CorrelationId, err, payment.Processor)
+		return false
 	}
+
+	io.Copy(io.Discard, resp.Body)
 	defer resp.Body.Close()
-	// if not between 200 to 300 return error
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		log.Printf("[?:Payment:ConsumeMessageFromQueue] Received non-2xx response: %v, Status Code: %d, Processor: %s", payment.CorrelationId, resp.StatusCode, payment.Processor)
-		return nil, fmt.Errorf("received non-2xx response: %d", resp.StatusCode)
 
+	return http.StatusOK == resp.StatusCode
+}
+
+func (ps *PaymentService) ProcessPayment(ctx context.Context, p *domain.Payment) (*domain.Payment, error) {
+	p.Processor = "default"
+	p.RequestedAt = time.Now()
+
+	for i := 0; i < 5; i++ {
+		processed := ps.sendPaymentRequest(ctx, p, ps.URL_DEFAULT_PROCESSOR)
+		if processed {
+			return p, nil
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 
-	if err := s.repoPayment.SavePayment(ctx, payment); err != nil {
-		log.Printf("[?:Payment:ConsumeMessageFromQueue] Failed to save payment: %v, Error: %v, Processor: %s", payment.CorrelationId, err, payment.Processor)
-		s.repoPayment.AddPaymentToQueue(ctx, payment) // Requeue the payment if saving fails
+	p.Processor = "fallback"
+	processed := ps.sendPaymentRequest(ctx, p, ps.URL_FALLBACK_PROCESSOR)
+	if processed {
+		return p, nil
+	}
+
+	return nil, fmt.Errorf("all processors failed")
+}
+
+func (ps *PaymentService) GetSummary(ctx context.Context, from, to time.Time) (*domain.Summary, error) {
+	dSummaryItems, err := ps.repoPayment.GetSummaryByProcessor(ctx, "default", from, to)
+	if err != nil {
 		return nil, err
 	}
 
-	return payment, nil
+	fSummaryItems, err := ps.repoPayment.GetSummaryByProcessor(ctx, "fallback", from, to)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.Summary{Default: *dSummaryItems, Fallback: *fSummaryItems}, nil
+
+}
+
+func (ps *PaymentService) ResetState(ctx context.Context) error {
+	return ps.repoPayment.ResetState(ctx)
+}
+
+func (ps *PaymentService) SavePayment(ctx context.Context, payment *domain.Payment) error {
+	if err := ps.repoPayment.SavePayment(ctx, payment); err != nil {
+		return err
+	}
+	return nil
 }

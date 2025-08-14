@@ -13,15 +13,7 @@ Content-Type: application/json
 }
 
 
-###
-# # @name getPayment
-GET {{url}}/payments?correlation_id=63ad7f3a-05ab-4400-a960-ac4e132c7fc0
-Content-Type: application/json
-Accept: application/json
-###
-
-
-## GET SUMARRY OF PAYMENTS
+### GET SUMARRY OF PAYMENTS
 GET {{url}}/payments-summary?from={{$datetime iso8601 -1 d}}&to={{$datetime iso8601}}
 
 ###
@@ -31,3 +23,12 @@ GET {{url}}/payments-summary?from={{$datetime iso8601 -1 d}}&to={{$datetime iso8
 POST http://localhost:8001/admin/purge-payments
 Content-Type: application/json
 X-Rinha-Token: 123
+
+###
+POST http://localhost:8001/payments
+Content-Type: application/json
+
+{
+    "correlationId": "{{_id}}",
+    "amount": 19.90
+}

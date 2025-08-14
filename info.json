@@ -1,0 +1,20 @@
+{
+  "name": "pedreiro.de.software",
+  "social": [
+    "github.com/nicolasmmb",
+    "www.linkedin.com/in/nicolasmmb"
+  ],
+  "source-code-repo": "github.com/nicolasmmb/go-rinha-backend-2025",
+  "langs": [
+    "go"
+  ],
+  "storages": [
+    "Valkey"
+  ],
+  "load-balancers": [
+    "haproxy"
+  ],
+  "other-technologies": [
+    "Gambiarra Otimizada"
+  ]
+}

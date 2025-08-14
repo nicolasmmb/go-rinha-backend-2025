@@ -5,20 +5,27 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/http/pprof"
 	"time"
 
-	"github.com/nicolasmmb/rinha-backend-2025/internal/config/env"
-	"github.com/nicolasmmb/rinha-backend-2025/internal/database"
-	"github.com/nicolasmmb/rinha-backend-2025/internal/repository/redis"
-	"github.com/nicolasmmb/rinha-backend-2025/internal/router"
-	"github.com/nicolasmmb/rinha-backend-2025/internal/service"
-	"github.com/nicolasmmb/rinha-backend-2025/internal/worker"
-	"github.com/nicolasmmb/rinha-backend-2025/libs"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/config/env"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/database"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/repository/redis"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/router"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/service"
+	"github.com/nicolasmmb/go-rinha-backend-2025/internal/worker"
+	"github.com/nicolasmmb/go-rinha-backend-2025/libs"
 )
 
 func main() {
-	env.Load()
+
+	// go func() {
+	// 	_ "net/http/pprof"
+	// 	log.Println(http.ListenAndServe("localhost:6060", nil))
+	// }()
+
+	if err := env.Load(); err != nil {
+		log.Fatalf("Error loading environment variables: %v", err)
+	}
 	env.ShowEnvValues()
 
 	rds, err := database.ConnectToRedisClient(env.Values.REDIS_ADDR)
@@ -27,28 +34,24 @@ func main() {
 	}
 	defer database.CloseRedisClient()
 
-	// Initialize Health Check Repository
-	healthCheckRepo := redis.NewHealthCheckRepository(rds)
+	ctx := context.Background()
 
-	// Initialize Payment Repository and Service
-	paymentRepo := redis.NewPaymentsRepository(rds)
-	paymentSvc := service.NewPaymentService(paymentRepo, healthCheckRepo)
-	paymentHandler := router.NewPaymentHandler(paymentSvc)
+	//Initialize Payment Repository and Service
+	paymentRepository := redis.NewPaymentsRepository(rds)
+	//Initialize Payment Service
+	paymentService := service.NewPaymentService(
+		paymentRepository,
+		env.Values.PAYMENT_PROCESSOR_URL_DEFAULT,
+		env.Values.PAYMENT_PROCESSOR_URL_FALLBACK,
+		env.Values.PAYMENT_CHAN_SIZE,
+	)
+	//Initialize Payment Worker
+	savePaymentWorker := worker.NewSavePaymentWorker(paymentService, env.Values.WORKER_POOL)
+	go savePaymentWorker.RunPaymentProcessor(ctx)
+
+	// Initialize Router and Payment Handler
+	paymentHandler := router.NewPaymentHandler(paymentService)
 	paymentRoutes := router.Routes(paymentHandler)
-
-	// Initialize Health Check Worker
-	w := worker.NewHealthCheckWorker(healthCheckRepo, env.Values.HEALTH_URL_DEFAULT, env.Values.HEALTH_URL_FALLBACK)
-	go w.Run(context.Background())
-	// Initialize Save Payment Worker
-	savePaymentWorker := worker.NewSavePaymentWorker(paymentSvc, env.Values.PAYMENT_PROCESSOR_URL_DEFAULT, env.Values.PAYMENT_PROCESSOR_URL_FALLBACK, env.Values.WORKER_POOL, 2000)
-	go savePaymentWorker.RunPaymentProcessor(context.Background())
-
-	// Configure Routes
-	paymentRoutes.HandleFunc("/debug/pprof/", pprof.Index)
-	paymentRoutes.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	paymentRoutes.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	paymentRoutes.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	paymentRoutes.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
 	SERVER_HOST := env.Values.SERVER_ADDR + ":" + fmt.Sprint(env.Values.SERVER_PORT)
 	server := &http.Server{
@@ -56,8 +59,8 @@ func main() {
 		Handler:        paymentRoutes,
 		ReadTimeout:    1 * time.Second,
 		WriteTimeout:   1 * time.Second,
-		IdleTimeout:    30 * time.Second,
-		MaxHeaderBytes: 256 << 10, // 256 KB
+		IdleTimeout:    15 * time.Second,
+		MaxHeaderBytes: 128 << 10, // 128 KB
 	}
 
 	log.Printf("Servidor iniciado em %s", SERVER_HOST)

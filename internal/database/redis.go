@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -29,8 +30,10 @@ func ConnectToRedisClient(addr string) (*redis.Client, error) {
 
 		c := redis.NewClient(&redis.Options{
 			Addr:         addr,
-			PoolSize:     128,
-			MinIdleConns: 16,
+			MaxRetries:   2,
+			MinIdleConns: 3,
+			PoolSize:     10,
+			PoolTimeout:  60 * time.Second,
 		})
 
 		pingErr := c.Ping(context.Background()).Err()
