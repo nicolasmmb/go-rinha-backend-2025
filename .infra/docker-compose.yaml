@@ -30,7 +30,7 @@ x-api-service: &api-service
   deploy:
     resources:
       limits:
-        cpus: "0.6"
+        cpus: "0.5"
         memory: "100MB"
   ulimits:
       nproc: 1000000
@@ -51,8 +51,6 @@ services:
     container_name: api-go-2
     hostname: api-go-2
  
-
-
   haproxy:
     image: haproxy:2.8-alpine
     container_name: lb
@@ -69,8 +67,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: "90MB"
+          cpus: "0.2"
+          memory: "100MB"
     ulimits:
       nproc: 1000000
       nofile:
@@ -81,18 +79,18 @@ services:
     image: valkey/valkey
     container_name: mem-db
     hostname: mem-db
-    # command: >
-      # redis-server --maxmemory-policy allkeys-lru --hz 100 --tcp-backlog 511 --timeout 0
+    command: >
+     valkey-server --maxmemory-policy allkeys-lru --tcp-backlog 511 --timeout 0 --maxclients 1024
       
     networks:
       - backend
     deploy:
       resources:
         limits:
-          cpus: "0.2"
-          memory: "60MB"
+          cpus: "0.3"
+          memory: "50MB"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "valkey-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
