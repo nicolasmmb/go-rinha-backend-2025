@@ -57,9 +57,9 @@ jobs:
         with:
           context: .
           push: true
-          file: ./Dockerfile
-          target: prod
+          file: ./.infra/Dockerfile
+          target: api-stage
           platforms: linux/amd64,linux/arm64
           tags: |
-            ghcr.io/emiliosheinz/rinha-de-backend-2025-go:${{ steps.get_tag.outputs.tag }}
-            ghcr.io/emiliosheinz/rinha-de-backend-2025-go:latest
+            ghcr.io/nicolasmmb/go-rinha-backend-2025:${{ steps.get_tag.outputs.tag }}
+            ghcr.io/nicolasmmb/go-rinha-backend-2025:latest
