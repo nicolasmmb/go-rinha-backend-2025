@@ -34,8 +34,9 @@ func (h *paymentHandler) SavePayment(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-
-	h.Svc.SendPaymentToQueue(payment)
+	go func(){
+		h.Svc.SendPaymentToQueue(payment)
+	}()
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 }
