@@ -1,15 +1,11 @@
 package router
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
 
-	// json "github.com/json-iterator/go"
-	// json
-
-	"arena"
+	json "github.com/json-iterator/go"
 
 	"github.com/nicolasmmb/go-rinha-backend-2025/internal/domain"
 	"github.com/nicolasmmb/go-rinha-backend-2025/internal/service"
@@ -17,7 +13,6 @@ import (
 
 const (
 	ROUTE_PAYMENT_SUMMARY = "GET /payments-summary"
-	ROUTE_PAYMENT_GET     = "GET /payments" // Uses query param `correlation_id`
 	ROUTE_PAYMENT_SAVE    = "POST /payments"
 	ROUTE_HEALTH_CHECK    = "GET /health"
 	ROUTE_RESET_PAYMENTS  = "GET /reset"
@@ -32,9 +27,8 @@ func NewPaymentHandler(svc *service.PaymentService) *paymentHandler {
 }
 
 func (h *paymentHandler) SavePayment(w http.ResponseWriter, r *http.Request) {
-	a := arena.NewArena()
-	defer a.Free()
-	payment := arena.New[domain.Payment](a)
+
+	var payment *domain.Payment
 
 	if err := json.NewDecoder(r.Body).Decode(&payment); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)

@@ -11,4 +11,7 @@
         "**/.dart_tool/**": true,
         "**/__debug_bin**": true
     },
+    "go.toolsEnvVars": {
+        "GOEXPERIMENT": "jsonv2,arenas,greenteagc"
+    },
 }

@@ -14,10 +14,15 @@ import (
 	"github.com/nicolasmmb/go-rinha-backend-2025/internal/service"
 	"github.com/nicolasmmb/go-rinha-backend-2025/internal/worker"
 	"github.com/nicolasmmb/go-rinha-backend-2025/libs"
-	//  _ "go.uber.org/automaxprocs"
 )
 
 func main() {
+
+	// go func() {
+	// 	_ "net/http/pprof"
+	// 	log.Println(http.ListenAndServe("localhost:6060", nil))
+	// }()
+
 	if err := env.Load(); err != nil {
 		log.Fatalf("Error loading environment variables: %v", err)
 	}

@@ -18,15 +18,19 @@ func NewSavePaymentWorker(svc *service.PaymentService, WORKERS int) *savePayment
 
 func (w *savePaymentWorker) RunPaymentProcessor(ctx context.Context) {
 	queue := w.svc.GetPaymentQueue()
-
 	for i := 0; i < w.WORKERS; i++ {
-		go w.processPayments(ctx, i, queue)
+		go w.processPayments(ctx, queue)
 	}
 }
 
-func (w *savePaymentWorker) processPayments(ctx context.Context, workerID int, queue <-chan domain.Payment) {
-	for payment := range queue {
-		p, err := w.svc.ProcessPayment(ctx, &payment)
+func (w *savePaymentWorker) processPayments(ctx context.Context, queue <-chan domain.Payment) {
+
+	var payment domain.Payment
+	var p *domain.Payment
+	var err error
+
+	for payment = range queue {
+		p, err = w.svc.ProcessPayment(ctx, &payment)
 		if err != nil {
 			continue
 		}

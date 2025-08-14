@@ -7,7 +7,8 @@ x-api-service: &api-service
     - backend
     - payment-processor
   environment:
-    - GOMEMLIMIT=200
+    # - GOGC=50
+    - GOMEMLIMIT=150
     - WORKER_POOL=15
     - PAYMENT_CHAN_SIZE=10000
     - REDIS_ADDR=mem-db:6379
@@ -77,11 +78,12 @@ services:
         hard: 1000000
 
   mem-db:
-    image: redis:alpine
+    image: valkey/valkey
     container_name: mem-db
     hostname: mem-db
-    command: >
-      redis-server --maxclients 65535 --maxmemory-policy allkeys-lru --hz 100 --tcp-backlog 511 --timeout 0
+    # command: >
+      # redis-server --maxmemory-policy allkeys-lru --hz 100 --tcp-backlog 511 --timeout 0
+      
     networks:
       - backend
     deploy:

@@ -10,8 +10,8 @@ run-load-test:
 # 	K6_WEB_DASHBOARD_OPEN=true \
 
 docker-compose-build-run-test:
-	@docker compose -f ../__PESSOAL__/rinha-de-backend-2025/payment-processor/docker-compose.yml down
-	@docker compose -f ../__PESSOAL__/rinha-de-backend-2025/payment-processor/docker-compose.yml up -d --build --remove-orphans --force-recreate
+	@docker compose -f ../__PESSOAL__/rinha-de-backend-2025/payment-processor/docker-compose-arm64.yml down
+	@docker compose -f ../__PESSOAL__/rinha-de-backend-2025/payment-processor/docker-compose-arm64.yml up -d --build --remove-orphans --force-recreate
 	@docker compose -f .infra/docker-compose.yaml down
 	@docker compose -f .infra/docker-compose.yaml up --build -d --remove-orphans --force-recreate
 	@for i in {1..10}; do \

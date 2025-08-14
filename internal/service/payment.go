@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -26,19 +29,41 @@ type PaymentService struct {
 }
 
 var HackBufferPool = sync.Pool{
-	New: func() interface{} { return &bytes.Buffer{} },
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
 }
 
 func NewPaymentService(paymentRepository core.PaymentRepositoryInterface, URL_DEFAULT_PROCESSOR string, URL_FALLBACK_PROCESSOR string, queueSize int) *PaymentService {
 	tr := &http.Transport{
-		IdleConnTimeout:     60 * time.Second,
+		DialContext: (&net.Dialer{
+			Timeout:   500 * time.Millisecond,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+
+		// Reutiliza conexões para diminuir a latência de novas requisições.
+		DisableKeepAlives: false,
+
+		// Limita o número total de conexões (ativas + ociosas) por host.
+		// Essencial para não sobrecarregar o serviço que você está chamando.
+		MaxConnsPerHost: 64,
+
+		// Número de conexões ociosas mantidas no pool para reutilização.
 		MaxIdleConns:        64,
 		MaxIdleConnsPerHost: 64,
-		DisableKeepAlives:   false,
-		DisableCompression:  true,
-		ForceAttemptHTTP2:   false,
+
+		// Tempo que uma conexão ociosa fica no pool antes de ser fechada.
+		IdleConnTimeout: 60 * time.Second,
+
+		// <<< AJUSTE: Desabilitar compressão é bom para serviços internos.
+		// A economia de CPU é maior que o ganho de banda na rede local.
+		DisableCompression: true,
+
+		// Forçar HTTP/2 pode não ser ideal para POSTs simples e rápidos. HTTP/1.1 é mais previsível aqui.
+		ForceAttemptHTTP2: false,
 	}
-	c := &http.Client{Transport: tr, Timeout: 2 * time.Second}
+
+	c := &http.Client{Transport: tr, Timeout: 5 * time.Second}
 
 	return &PaymentService{
 		repoPayment:            paymentRepository,
@@ -64,11 +89,13 @@ func (ps *PaymentService) GetPaymentQueue() <-chan domain.Payment {
 }
 
 func (ps *PaymentService) sendPaymentRequest(ctx context.Context, payment *domain.Payment, url string) bool {
+
 	buf := HackBufferPool.Get().(*bytes.Buffer)
 	buf.Reset()
 	defer HackBufferPool.Put(buf)
 
 	if err := json.NewEncoder(buf).Encode(payment); err != nil {
+		slog.Warn("falha ao encodar pagamento para JSON", "error", err.Error())
 		return false
 	}
 
@@ -83,33 +110,23 @@ func (ps *PaymentService) sendPaymentRequest(ctx context.Context, payment *domai
 	if err != nil {
 		return false
 	}
+
+	io.Copy(io.Discard, resp.Body)
 	defer resp.Body.Close()
 
 	return http.StatusOK == resp.StatusCode
 }
 
 func (ps *PaymentService) ProcessPayment(ctx context.Context, p *domain.Payment) (*domain.Payment, error) {
-	p.RequestedAt = time.Now()
-	bodyMap := map[string]any{
-		"correlationId": p.CorrelationId,
-		"amount":        p.Amount,
-		"requestedAt":   p.RequestedAt.Format(time.RFC3339),
-	}
-
-	buf := HackBufferPool.Get().(*bytes.Buffer)
-	buf.Reset()
-	defer HackBufferPool.Put(buf)
-
-	if err := json.NewEncoder(buf).Encode(bodyMap); err != nil {
-		return nil, err
-	}
-
 	p.Processor = "default"
+	p.RequestedAt = time.Now()
+
 	for i := 0; i < 5; i++ {
 		processed := ps.sendPaymentRequest(ctx, p, ps.URL_DEFAULT_PROCESSOR)
 		if processed {
 			return p, nil
 		}
+		time.Sleep(5 * time.Millisecond)
 	}
 
 	p.Processor = "fallback"
