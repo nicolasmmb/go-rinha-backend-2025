@@ -10,7 +10,7 @@ A submissão para a edição de 2025 da Rinha de Backend, desenvolvida em Go.
     -   LinkedIn: [nicolasmmb](https://www.linkedin.com/in/nicolasmmb)
 -   **Repositório:** [nicolasmmb/go-rinha-backend-2025](https://github.com/nicolasmmb/go-rinha-backend-2025)
 
-![Alt text](./docs/img.png "Optional Title")
+![Rooster in Chains](https://github.com/nicolasmmb/go-rinha-backend-2025/blob/main/docs/img.png?raw=true "Rooster in Chains")
 ---
 
 ---
