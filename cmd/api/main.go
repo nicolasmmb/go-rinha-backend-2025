@@ -32,6 +32,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Erro ao obter o cliente Redis: %v", err)
 	}
+	if err := database.WarmUpDB(rds); err != nil {
+		log.Fatalf("Erro ao aquecer o banco de dados: %v", err)
+	}
 	defer database.CloseRedisClient()
 
 	ctx := context.Background()

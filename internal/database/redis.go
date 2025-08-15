@@ -50,6 +50,27 @@ func ConnectToRedisClient(addr string) (*redis.Client, error) {
 	return client, err
 }
 
+func WarmUpDB(client *redis.Client) error {
+	log.Println("🔥 Iniciando o aquecimento do banco de dados...")
+
+	ctx := context.Background()
+	pipe := client.Pipeline()
+
+	// Pré-alocando 100 chaves
+	for i := 0; i < 100; i++ {
+		key := fmt.Sprintf("warmup:%d", i)
+		pipe.Set(ctx, key, "true", 1*time.Minute)
+	}
+
+	_, err := pipe.Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("❌ falha ao aquecer o banco de dados: %w", err)
+	}
+
+	log.Println("✅ Banco de dados aquecido com sucesso!")
+	return nil
+}
+
 func CloseRedisClient() {
 	if client != nil {
 		if err := client.Close(); err != nil {
